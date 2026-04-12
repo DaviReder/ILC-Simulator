@@ -20,25 +20,28 @@
 
 
 unsigned int analogLuz(unsigned int saida, float luminosidade){
-    unsigned int brilho = 0; // Local para calcular o valor de 4 bits
+    unsigned int brilho = 0;
 
-    if (luminosidade < 100)      brilho = 0x08; // 1000 (100%)
-    else if (luminosidade < 200) brilho = 0x04; // 0100 (75%)
-    else if (luminosidade < 270) brilho = 0x02; // 0010 (50%)
-    else if (luminosidade < 350) brilho = 0x01; // 0010 (25%)
-    else if (luminosidade < 500) brilho = 0x0F; // 0000 (0%)
+    // Lógica de Dimmer (Inversa: menos luz externa -> mais brilho interno)
+    if (luminosidade < 100.0)      brilho = 0x08; // 100% (1000)
+    else if (luminosidade < 200.0) brilho = 0x04; // 75%  (0100)
+    else if (luminosidade < 270.0) brilho = 0x02; // 50%  (0010)
+    else if (luminosidade < 350.0) brilho = 0x01; // 25%  (0001)
+    else if (luminosidade < 500.0) brilho = 0x00; // 0%   (0000) - CORRIGIDO AQUI
     else {
-        // Desliga o bit digital da luz (Bit 2)
-        saida &= ~(1 << 2);
-        saida &= ~(0x0F << SHIFT_LUZ);
+        // Acima de 500, desliga o sistema de iluminação completamente
+        saida &= ~(1 << 2);             // Desliga Bit Digital
+        saida &= ~(0x0F << SHIFT_LUZ);  // Zera Dimmer
         return saida;
     }
 
-    // Ativa o bit digital da luz
+    // Ativa o bit digital (Sistema Operacional)
     saida |= (1 << 2);
-    // Limpa a "gaveta" da luz antes de escrever (Bits 8 a 11)
+
+    // Limpa os 4 bits de brilho (importante para não "sujar" o registrador)
     saida &= ~(0x0F << SHIFT_LUZ);
-    // Insere o brilho na posição correta
+
+    // Insere o novo brilho
     saida |= (brilho << SHIFT_LUZ);
 
     return saida;
@@ -48,11 +51,11 @@ unsigned int analogTemp(unsigned int saida, float temperatura, float umidade) {
     unsigned int decisoes = 0; // Temporário para montar os 3 bits
 
     // BIT 0 (Aquecedor): Se < 18°C
-    if (temperatura < 16.0) {
+    if (temperatura < 17.5) {
         decisoes |= 0x01; // 001
     }
     // BIT 2 (Ar-Condicionado): Se > 26°C
-    else if (temperatura > 26.0) {
+    else if (temperatura > 24.0) {
         decisoes |= 0x04; // 100
     }
 
@@ -71,13 +74,11 @@ unsigned int analogTemp(unsigned int saida, float temperatura, float umidade) {
 }
 
 int executaSimulacaoPLC(){
-    unsigned int saida=0, mascara;
+    unsigned int saida=0;
 
     //Armazena as leituras de cada sensor (temperatura, porta, luminosidade, umidade, presença)
     Sensor *s = buscarSensor(raiz_sensores, 1);
     float temperatura = conversorAD(*s);
-    s = buscarSensor(raiz_sensores, 2);
-    float porta = conversorAD(*s);
     s = buscarSensor(raiz_sensores, 3);
     float luminosidade = conversorAD(*s);
     s = buscarSensor(raiz_sensores, 4);
@@ -104,15 +105,9 @@ int executaSimulacaoPLC(){
 }
 
 void* cicloControleAtuadores(void* arg) {
-    while(1) {
+    while(rodando_sistema) {
         Sensor *s ;
         s = buscarSensor(raiz_sensores, 2);
-        float porta = conversorAD(*s);
-        s = buscarSensor(raiz_sensores, 3);
-        float luminosidade = conversorAD(*s);
-        s = buscarSensor(raiz_sensores, 4);
-        float presenca = conversorAD(*s);
-        s = buscarSensor(raiz_sensores, 5);
         float umidade = conversorAD(*s);
         s = buscarSensor(raiz_sensores, 1);
         float temperatura = conversorAD(*s);
@@ -120,7 +115,6 @@ void* cicloControleAtuadores(void* arg) {
 
         // 1. Executa a lógica para decidir o que ligar
         unsigned int status = executaSimulacaoPLC();
-        unsigned int statusLuz = (status >> 8) & 0x0F;
 
         if(status & 0x01){ //Alguem na sala?
             // Porta já está aberta
@@ -183,9 +177,9 @@ void* cicloControleAtuadores(void* arg) {
 void monitorarSaidas(unsigned int saida) {
     printf("\n===========================================");
     printf("\n   PAINEL DE CONTROLE DO PLC (DEBUG)");
-    printf("\n===========================================");
+    printf("\n");
     printf("\n[RAW DATA] Hex: 0x%08X", saida);
-    printf("\n-------------------------------------------");
+    printf("\n");
 
     unsigned int clima = (saida >> SHIFT_CLIMA) & MASCARA_CLIMA;
     // 1. INTERPRETAÇÃO DOS BITS DIGITAIS (Lógica Discreta)
@@ -203,11 +197,11 @@ void monitorarSaidas(unsigned int saida) {
 
     printf("\n\n[ANALOGICO - ILUMINACAO]");
     printf("\n  Intensidade:   ");
-    if (statusLuz & 0x08)      printf("100% (FULL)");
-    else if (statusLuz & 0x04) printf("75%");
-    else if (statusLuz & 0x02) printf("50%");
-    else if (statusLuz & 0x01) printf("25%");
-    else                       printf("0% (OFF)");
+    if (statusLuz & 0x08)      printf("100%% (FULL)");
+    else if (statusLuz & 0x04) printf("75%%");
+    else if (statusLuz & 0x02) printf("50%%");
+    else if (statusLuz & 0x01) printf("25%%");
+    else                       printf("0%% (OFF)");
 
     printf("\n===========================================\n");
 }

@@ -76,6 +76,7 @@ float conversorAD(Sensor s){
         float fracao = (s.leitura_atual - 4)/16.0;
         return (fracao * dif)+s.range_min;
     }
+    return 0;
 }
 
 void gerarleituraSensor(Sensor *s){
@@ -86,7 +87,7 @@ void gerarleituraSensor(Sensor *s){
 
         //Convertendo para o valor real medido.
         float convertido = conversorAD(*s);
-        printf("\nValores gerados:\n Corrente (4-24mA): %d.\nConvertido: %.2f.\n", numGerado, convertido);
+        printf("\nSensor: %s\nCorrente (4-24mA): %d.\n%s: %.2f.\n", s->tag, numGerado, s->tag, convertido);
 
         //Adicionando ao historico de medidas:
         s->historico[s->pos_hist] = convertido;
@@ -116,10 +117,10 @@ float mediaLeiturasSensor(Sensor *s){
 
 void imprimirInformacoesSensor(Sensor *s){
     if(s){
-        printf("\nSensor: [ID: %d]  [TAG: %s]", s->id, s->tag);
-        printf("\nRange: [%.1f] a [%.1f]", s->range_min, s->range_max);
-        printf("\nUltima leitura (mA): [%.0f]", s->leitura_atual);
-        printf("\nLeitura real: [%.1f]", conversorAD(*s));
+        printf("\n[%s]: %d", s->tag, s->id);
+        printf("\n[Range]: %.0f a %.0f", s->range_min, s->range_max);
+        printf("\n[Leitura (mA)]: %.1f", s->leitura_atual);
+        printf("\n[Medida real]: [%.1f]\n", conversorAD(*s));
     }
     else
         printf("\nSensor não encontrado.\n");

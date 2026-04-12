@@ -1,12 +1,6 @@
 #ifndef ARVORE_H_INCLUDED
 #define ARVORE_H_INCLUDED
-#include "../models.h"
-
-typedef struct no{
-    Sensor sensor;
-    struct no *esquerda, *direita;
-    short altura;
-}No;
+#include "models.h"
 
 //PARA LEITURA DO SENSOR:
 extern No *raiz_sensores; // Raiz está em outro arquivo.

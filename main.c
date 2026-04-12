@@ -11,6 +11,7 @@
 void configurarTerminal();
 void limparTela();
 int inicializaSistema();
+volatile int rodando_sistema = 1;
 
 int main() {
     pthread_t thread_id;
@@ -27,6 +28,7 @@ int main() {
 
     // 2. Dispara a Thread de Controle (Background)
     pthread_create(&thread_id, NULL, cicloControleAtuadores, NULL);
+    system("pause");
 
     do {
         limparTela();
@@ -46,7 +48,6 @@ int main() {
         printf("[1] Listar Sensores (Detalhado)    [3] Media de Leitura por ID\n");
         printf("[2] Aleatorizar Sensores (Ruido)   [4] Refresh Manual do Painel\n");
         printf("[0] Sair e gerar LOG Final\n");
-        printf("----------------------------------------------------------------------\n");
         printf("\033[1;32mCOMANDO > \033[0m");
 
         if (scanf("%d", &opcao) != 1) {
@@ -72,7 +73,7 @@ int main() {
                     if (s) gerarleituraSensor(s);
                 }
                 printf("\n\033[0;32mSensores aleatorizados com sucesso!\033[0m\n");
-                Sleep(800); // Pequena pausa para feedback visual
+                Sleep(1500); // Pequena pausa para feedback visual
                 break;
 
             case 3:
@@ -81,7 +82,7 @@ int main() {
                 Sensor *s_alvo = buscarSensor(raiz_sensores, id_busca);
                 if (s_alvo) {
                     float media = mediaLeiturasSensor(s_alvo);
-                    printf("\n\033[1;35m[RESULTADO] Media (ID %d): %.2f mA\033[0m\n", id_busca, media);
+                    printf("\n\033[1;35m[RESULTADO] Media (ID %d): %.2f u.m.\033[0m\n", id_busca, media);
                 } else {
                     printf("\n\033[0;31m[ERRO] Sensor ID %d nao encontrado.\033[0m\n", id_busca);
                 }
@@ -94,6 +95,10 @@ int main() {
 
             case 0:
                 printf("\n\033[1;33mFinalizando threads e gerando LOG...\033[0m\n");
+                rodando_sistema = 0;
+                // 2. Esperar a thread terminar de verdade.
+                pthread_join(thread_id, NULL);
+
                 // Aqui você chamaria sua função de LOG:
                 // gerarRelatorioLog("data/log_final.txt");
                 break;
@@ -113,26 +118,42 @@ int main() {
 // --- IMPLEMENTAÇÃO DAS FUNÇÕES AUXILIARES ---
 
 void configurarTerminal() {
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
     HWND console = GetConsoleWindow();
 
-    // Define o título
-    SetConsoleTitle("PLC Industrial Simulator v1.0 - Monitoramento Estatico");
+    // 1. Título
+    SetConsoleTitle("PLC Industrial Simulator v1.0 - HD Monitor");
 
-    // Trava o tamanho da janela (850x700 para caber o painel confortavelmente)
+    // 2. Definir o tamanho do BUFFER antes da janela
+    // Diminuí um pouco os valores para evitar conflito com fontes grandes
+    COORD coord;
+    coord.X = 120; // 120 colunas de texto
+    coord.Y = 40;  // 40 linhas de texto
+    SetConsoleScreenBufferSize(hConsole, coord);
+
+    // 3. Ajustar a JANELA física
+    // O MoveWindow agora vem depois para garantir que o buffer já existe
     RECT r;
     GetWindowRect(console, &r);
-    MoveWindow(console, r.left, r.top, 850, 700, TRUE);
+    MoveWindow(console, r.left, r.top, 1280, 720, TRUE);
 
-    // Desabilita redimensionamento e maximizar para manter o layout fixo
+    // 4. Travar o estilo (Sem redimensionar)
     long style = GetWindowLong(console, GWL_STYLE);
     style &= ~WS_MAXIMIZEBOX;
     style &= ~WS_SIZEBOX;
     SetWindowLong(console, GWL_STYLE, style);
+
+    // 5. Cursor invisível
+    CONSOLE_CURSOR_INFO cursorInfo;
+    GetConsoleCursorInfo(hConsole, &cursorInfo);
+    cursorInfo.bVisible = FALSE;
+    SetConsoleCursorInfo(hConsole, &cursorInfo);
 }
 
 void limparTela() {
-    // Sequência ANSI: H (Home) e J (Limpa do cursor até o fim)
-    printf("\033[H\033[J");
+    // Se o \033[H estiver deixando rastro, use este comando duplo:
+    // \033[H (Home) + \033[2J (Limpa a tela inteira mas mantém o cursor no topo)
+    printf("\033[H\033[2J");
 }
 
 int inicializaSistema() {

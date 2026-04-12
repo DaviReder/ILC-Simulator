@@ -1,6 +1,6 @@
 #ifndef CONTROLLER_H_INCLUDED
 #define CONTROLLER_H_INCLUDED
-#include "../models.h"
+#include "../include/models.h"
 #include "../include/arvore.h"
 
 //Variaveis de BITWISE.

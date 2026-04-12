@@ -1,6 +1,8 @@
 #ifndef MODELS_H_INCLUDED
 #define MODELS_H_INCLUDED
 
+extern volatile int rodando_sistema;
+
 typedef struct {
     int id;                // Chave da Árvore
     char tag[10];          // Ex: "TEMP_01"
@@ -11,11 +13,19 @@ typedef struct {
     int pos_hist;          // Índice do array circular
 } Sensor;
 
+/*
 typedef struct {
     int id;
     char nome[20];
     unsigned char mascara; // Ex: 0000 0100 (Aciona no bit 2)
     int status;            // 0: OFF, 1: ON
 } Atuador;
+*/
+
+typedef struct no{
+    Sensor sensor;
+    struct no *esquerda, *direita;
+    short altura;
+}No;
 
 #endif // MODELS_H_INCLUDED
