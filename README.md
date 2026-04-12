@@ -1,6 +1,6 @@
 # ⚡ ILC-Simulator (Industrial Logic Core)
 
-**ILC-Simulator** não é apenas um projeto acadêmico; é um motor de lógica industrial de baixo nível projetado para emular o comportamento de um **PLC (Programmable Logic Controller)** real. O foco principal é demonstrar alta competência em linguagem C, estruturas de dados complexas e sistemas concorrentes aplicados à automação.
+**ILC-Simulator** não é um projeto acadêmico; é um motor de lógica industrial de baixo nível projetado para emular o comportamento de um **PLC (Programmable Logic Controller)** real. O foco principal é demonstrar alta competência em linguagem C, estruturas de dados complexas e sistemas concorrentes aplicados à automação.
 
 O projeto simula a jornada física do dado: desde a leitura de corrente (mA) de um sensor simulado, passando por um processo de conversão analógico-digital (ADC), até a manipulação de registradores de 32 bits para o acionamento de atuadores via lógica de bits (*bitwise*).
 
@@ -11,7 +11,9 @@ O projeto simula a jornada física do dado: desde a leitura de corrente (mA) de 
 O sistema foi desenhado para ser eficiente, robusto e escalável, utilizando conceitos fundamentais de Ciência da Computação:
 
 ### 1. Fluxo de Execução (IHM vs. Controle)
-![Fluxograma do Sistema](assets/fluxograma.png)
+<p align="center">
+  <img src="assets/fluxograma.png" alt="Fluxograma do Sistema">
+</p>
 *(O diagrama acima detalha a separação entre as threads de interface e a lógica de scan do PLC)*
 
 ### 2. Gestão de Dados com Árvore AVL
@@ -65,6 +67,6 @@ O ILC-Simulator é um projeto "vivo" e passará pelas seguintes implementações
 
 ## 🎓 Sobre o Autor
 
-Desenvolvido por **Davi**, estudante de Engenharia de Controle e Automação (PUC) e Ciência da Computação (Uninter). Este projeto é a intersecção entre o rigor da engenharia de hardware e a otimização de software de alto desempenho.
+Desenvolvido por **Davi**, estudante de Engenharia de Controle e Automação e Ciência da Computação. Este projeto é a intersecção entre o rigor da engenharia de hardware e a otimização de software de alto desempenho.
 
 ---
