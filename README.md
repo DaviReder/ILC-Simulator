@@ -51,7 +51,7 @@ O ILC-Simulator é um projeto "vivo" e passará pelas seguintes implementações
 ### Passo a Passo
 1.  **Clone o repositório:**
     ```bash
-    git clone [https://github.com/seu-usuario/ilc-simulator.git](https://github.com/seu-usuario/ilc-simulator.git)
+    git clone [https://github.com/DaviReder/ilc-simulator.git](https://github.com/DaviReder/ilc-simulator.git)
     cd ilc_simulator
     ```
 2.  **Compile o projeto:**
