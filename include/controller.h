@@ -1,7 +1,6 @@
 #ifndef CONTROLLER_H_INCLUDED
 #define CONTROLLER_H_INCLUDED
-#include "../include/models.h"
-#include "../include/arvore.h"
+#include "arvore.h"
 
 //Variaveis de BITWISE.
 #define SHIFT_DIGITAL 0

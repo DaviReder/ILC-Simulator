@@ -13,7 +13,7 @@ No* criarNo(Sensor s){
         return novo;
     }
     else
-        printf("\nErro ao alocar memoria.\n");
+        log_evento("Erro", "Erro ao alocar memória. (Linha 17, arvoreAVL.c)");
     return NULL;
 }
 
@@ -100,7 +100,6 @@ No* balancearAVL(No *raiz){
 }
 
 No* inserirArvoreAVL(No *raiz, Sensor s){
-    No *aux = raiz;
     if(raiz == NULL){
         return criarNo(s);
     }
@@ -112,6 +111,7 @@ No* inserirArvoreAVL(No *raiz, Sensor s){
         raiz->esquerda = inserirArvoreAVL(raiz->esquerda, s);
     }
     else{
+        log_evento("AVISO", "Esse sensor já existe! ID: %d. (Linha 115, arvoreAVL.c)", s.id);
         printf("\nEsse sensor já existe! ID: %d.\n", s.id);
     }
 

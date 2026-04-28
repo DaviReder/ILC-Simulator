@@ -3,17 +3,15 @@
 #include <locale.h>
 #include "../include/arvore.h"
 
-// Variável global
 No *raiz_sensores = NULL;
 
 void carregar_configuracao(const char *caminho_arquivo) {
-    // 1. Necessário pois o arquivo txt lido apresenta float com (.) entre decimais;
     char *locale_original = setlocale(LC_NUMERIC, NULL);
     setlocale(LC_NUMERIC, "C");
 
-    // 2. ABERTURA SEGURA
     FILE *arquivo = fopen(caminho_arquivo, "r");
     if (arquivo == NULL) {
+        log_evento("CRITICO", "Arquivo  (Linha 17, arvoreAVL.c)");
         perror("ERRO CRITICO AO ABRIR CONFIG");
         setlocale(LC_NUMERIC, locale_original); // Restaura antes de sair
         return;
@@ -22,8 +20,6 @@ void carregar_configuracao(const char *caminho_arquivo) {
     Sensor s;
     int res;
 
-    // 3. LOOP DE LEITURA ROBUSTO
-    // O espaço antes de %d pula espaços em branco e quebras de linha residuais
     while ((res = fscanf(arquivo, " %d , %[^,] , %f , %f",
                          &s.id, s.tag, &s.range_min, &s.range_max)) != EOF) {
 
@@ -35,18 +31,17 @@ void carregar_configuracao(const char *caminho_arquivo) {
 
             // Inserção na estrutura de dados
             raiz_sensores = inserirArvoreAVL(raiz_sensores, s);
-            printf("[LOG] Sensor %-10s (ID: %d) carregado.\n", s.tag, s.id);
+            log_evento("SUCESSO", "Sensor %-10s (ID: %d) carregado.", s.tag, s.id);
         }
         else if (res > 0) {
-            printf("[ERRO] Falha na sintaxe da linha. Campos lidos: %d\n", res);
+            log_evento("ERRO", "Falha na sintaxe (Linha 42, sensor.c). Campos lidos: %d.", res);
             break;
         }
     }
 
-    // 4. FINALIZAÇÃO
     fclose(arquivo);
     setlocale(LC_NUMERIC, locale_original);
-    printf("[INFO] Processo de configuracao concluido.\n");
+    log_evento("SUCESSO", "Processo de configuracao concluido.", s.tag, s.id);
 }
 
 void imprimirSensor(){
@@ -71,7 +66,6 @@ void imprimirSensor(){
 
 float conversorAD(Sensor s){
     if(s.leitura_atual != -999){
-        //Convertendo para o valor real medido.
         float dif = s.range_max - s.range_min;
         float fracao = (s.leitura_atual - 4)/16.0;
         return (fracao * dif)+s.range_min;
@@ -81,21 +75,19 @@ float conversorAD(Sensor s){
 
 void gerarleituraSensor(Sensor *s){
     if(s){
-        //Vou simular uma corrente de saída do sensor: 4-20mA.
         int numGerado = (rand() % 17) + 4;
-        s->leitura_atual = numGerado; //Atribui uma corrente como leitura atual.
+        s->leitura_atual = numGerado;
 
-        //Convertendo para o valor real medido.
         float convertido = conversorAD(*s);
-        printf("\nSensor: %s\nCorrente (4-24mA): %d.\n%s: %.2f.\n", s->tag, numGerado, s->tag, convertido);
-
-        //Adicionando ao historico de medidas:
+        log_evento("ALEATORIZADO", "TAG: %s | Corrente: %dmA | Valor: %.2f %s", s->tag, numGerado, convertido, (s->id == 1 ? "°C" : "u.m."));
         s->historico[s->pos_hist] = convertido;
         s->pos_hist++;
         s->pos_hist %= 10;
     }
-    else
+    else{
+        log_evento("WARNING", "Sensor não encontrado (Linha 98, sensor.c).");
         printf("\nSensor não encontado!\n");
+    }
 }
 
 float mediaLeiturasSensor(Sensor *s){
@@ -110,6 +102,7 @@ float mediaLeiturasSensor(Sensor *s){
         }
         return (media/j);
     }
+    log_evento("WARNING", "Sensor não encontrado (Linha 114, sensor.c).");
     printf("\nSensor não encontrado.\n");
     return 0;
 

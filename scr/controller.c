@@ -37,10 +37,8 @@ unsigned int analogLuz(unsigned int saida, float luminosidade){
 
     // Ativa o bit digital (Sistema Operacional)
     saida |= (1 << 2);
-
     // Limpa os 4 bits de brilho (importante para não "sujar" o registrador)
     saida &= ~(0x0F << SHIFT_LUZ);
-
     // Insere o novo brilho
     saida |= (brilho << SHIFT_LUZ);
 
@@ -96,7 +94,9 @@ int executaSimulacaoPLC(){
 
         // A porta abre se houver presença (Deixe a porta aberta)
         saida &= ~0x02;
+        log_evento("SEGURANCA", "Presenca detectada. Porta DESTRANCADA.");
     } else {
+        log_evento("SEGURANCA", "Sala vazia. Porta TRANCADA.");
         // Sala Vazia: Tudo OFF e Porta FECHADA (Bit 1 em 1)
         saida = 0x02;
     }
@@ -124,6 +124,7 @@ void* cicloControleAtuadores(void* arg) {
             if(temperatura <= 20){
                 if(s->leitura_atual <= 20 && s->leitura_atual >= 4){
                     s->leitura_atual += 0.1;
+                    log_evento("ATUADOR", "AQUECEDOR ON | Temp Atual: %.2fC", temperatura);
                     //Adicionando ao historico de medidas:
                     s->historico[s->pos_hist] = conversorAD(*s);
                     s->pos_hist++;
@@ -135,6 +136,7 @@ void* cicloControleAtuadores(void* arg) {
             else if(temperatura >= 20.5){
                 if(s->leitura_atual <= 20 && s->leitura_atual >= 4){
                     s->leitura_atual -= 0.1;
+                    log_evento("ATUADOR", "AR-CONDICIONADO ON | Temp Atual: %.2fC", temperatura);
                     //Adicionando ao historico de medidas:
                     s->historico[s->pos_hist] = conversorAD(*s);
                     s->pos_hist++;
@@ -148,6 +150,7 @@ void* cicloControleAtuadores(void* arg) {
             if(umidade<=55){
                 if(s->leitura_atual <= 20 && s->leitura_atual >= 4){
                     s->leitura_atual += 0.1;
+                    log_evento("ATUADOR", "UMIDIFICADOR ON | Umidade: %.2f%%", umidade);
                     //Adicionando ao historico de medidas:
                     s->historico[s->pos_hist] = conversorAD(*s);
                     s->pos_hist++;
@@ -156,6 +159,7 @@ void* cicloControleAtuadores(void* arg) {
                 }
             }
             if(teveControle == 0){
+                log_evento("SISTEMA", "Sala na situação perfeita!");
                 printf("\nSala na situação perfeita.\n");
                 sleep(25);
             }
@@ -164,6 +168,7 @@ void* cicloControleAtuadores(void* arg) {
             }
         }
         else{
+            log_evento("SISTEMA", "SALA VAZIA | Entrando em modo economia.");
             printf("\nNinguem na sala, parando ou deixando de efetuar o controle.\n");
             sleep(15);
         }

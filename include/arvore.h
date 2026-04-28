@@ -1,6 +1,7 @@
 #ifndef ARVORE_H_INCLUDED
 #define ARVORE_H_INCLUDED
 #include "models.h"
+#include "log.h"
 
 //PARA LEITURA DO SENSOR:
 extern No *raiz_sensores; // Raiz está em outro arquivo.

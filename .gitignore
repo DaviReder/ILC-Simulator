@@ -5,6 +5,7 @@
 bin/
 obj/
 data/log_final.txt
+log.txt
 
 # === Binarios e Arquivos Temporarios (Padrao C) ===
 *.exe

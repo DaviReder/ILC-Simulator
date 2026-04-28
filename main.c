@@ -4,7 +4,6 @@
 #include <time.h>
 #include <pthread.h>
 #include <windows.h>
-#include "include/arvore.h"
 #include "include/controller.h"
 
 // Protótipos de funções locais
@@ -70,7 +69,7 @@ int main() {
             case 2:
                 for (int i = 1; i <= 5; i++) {
                     s = buscarSensor(raiz_sensores, i);
-                    if (s) gerarleituraSensor(s);
+                    if(s) gerarleituraSensor(s);
                 }
                 printf("\n\033[0;32mSensores aleatorizados com sucesso!\033[0m\n");
                 Sleep(1500); // Pequena pausa para feedback visual
