@@ -1,212 +1,126 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <locale.h>
-#include "../include/controller.h"
-
-//Thread:
 #include <pthread.h>
-#include <unistd.h> // Para a função sleep()
+#include <unistd.h>
+#include "../include/controller.h"
+#include "../include/arvoreAVL.h"
+#include "../include/sensor.h"
+#include "../include/log.h"
+#include "../include/interface.h"
+#include "../include/atuador.h"
 
-// FUNÇÃO DE CADA BIT:
-// INT 00000000 00000000 00000000 00000000
-// 00000000 00000000 00000000 00000001 -> Presenca
-// 00000000 00000000 00000000 00000010 -> Porta fechada
-// 00000000 00000000 00000000 00000100 -> Luminosidade
-// 00000000 00000000 00000000 00001000 -> Temperatura digital
-// 00000000 00000000 00000000 00010000 -> Umidade Digital
-// 00000000 00000000 00001111 00000000 -> Analogico luminosidade
-// NÃO IMPLEMENTADO:
-// 00000000 00000000 01110000 00000000 -> Analogico temperatura/umidade
+// Variáveis globais definidas em outros módulos
+extern No *raiz_sensores;
+extern volatile int rodando_sistema;
+static unsigned int registro_saida_mestre = 0;
 
+unsigned int calcularLogicaControle(float t_atual, float u_atual, float luz_atual, int presenca) {
 
-unsigned int analogLuz(unsigned int saida, float luminosidade){
-    unsigned int brilho = 0;
-
-    // Lógica de Dimmer (Inversa: menos luz externa -> mais brilho interno)
-    if (luminosidade < 100.0)      brilho = 0x08; // 100% (1000)
-    else if (luminosidade < 200.0) brilho = 0x04; // 75%  (0100)
-    else if (luminosidade < 270.0) brilho = 0x02; // 50%  (0010)
-    else if (luminosidade < 350.0) brilho = 0x01; // 25%  (0001)
-    else if (luminosidade < 500.0) brilho = 0x00; // 0%   (0000) - CORRIGIDO AQUI
-    else {
-        // Acima de 500, desliga o sistema de iluminação completamente
-        saida &= ~(1 << 2);             // Desliga Bit Digital
-        saida &= ~(0x0F << SHIFT_LUZ);  // Zera Dimmer
-        return saida;
+    // 1. Lógica de Segurança (Presença)
+    if (!presenca) {
+        // Se não há ninguém, desliga tudo e ativa a tranca da porta (Bit 31)
+        registro_saida_mestre = BIT_PORTA_TRANCA;
+        return registro_saida_mestre;
     }
 
-    // Ativa o bit digital (Sistema Operacional)
-    saida |= (1 << 2);
-    // Limpa os 4 bits de brilho (importante para não "sujar" o registrador)
-    saida &= ~(0x0F << SHIFT_LUZ);
-    // Insere o novo brilho
-    saida |= (brilho << SHIFT_LUZ);
-
-    return saida;
-}
-
-unsigned int analogTemp(unsigned int saida, float temperatura, float umidade) {
-    unsigned int decisoes = 0; // Temporário para montar os 3 bits
-
-    // BIT 0 (Aquecedor): Se < 18°C
-    if (temperatura < 17.5) {
-        decisoes |= 0x01; // 001
+    // 2. Controle de Temperatura com Histerese e Intertravamento
+    // Logica para o Aquecedor
+    if (t_atual < (SETPOINT_TEMP - HISTERESE_TEMP)) {
+        registro_saida_mestre |= BIT_AQUECEDOR;
+        registro_saida_mestre &= ~BIT_AR_COND; // Segurança: Nunca liga os dois juntos
     }
-    // BIT 2 (Ar-Condicionado): Se > 26°C
-    else if (temperatura > 24.0) {
-        decisoes |= 0x04; // 100
+    else if (t_atual >= SETPOINT_TEMP) {
+        registro_saida_mestre &= ~BIT_AQUECEDOR;
     }
 
-    // BIT 1 (Umidificador): Se umidade < 40%
-    if (umidade < 40.0) {
-        decisoes |= 0x02; // 010
+    // Logica para o Ar-Condicionado
+    if (t_atual > (SETPOINT_TEMP + HISTERESE_TEMP)) {
+        registro_saida_mestre |= BIT_AR_COND;
+        registro_saida_mestre &= ~BIT_AQUECEDOR; // Segurança: Intertravamento
+    }
+    else if (t_atual <= SETPOINT_TEMP) {
+        registro_saida_mestre &= ~BIT_AR_COND;
     }
 
-    // --- APLICAÇÃO NO REGISTRADOR ---
-    // 1. Limpa a "gaveta" de 3 bits na posição 12
-    saida &= ~(MASCARA_CLIMA << SHIFT_CLIMA);
-    // 2. Coloca as decisões no elevador e sobe até o andar 12
-    saida |= (decisoes << SHIFT_CLIMA);
-
-    return saida;
-}
-
-int executaSimulacaoPLC(){
-    unsigned int saida=0;
-
-    //Armazena as leituras de cada sensor (temperatura, porta, luminosidade, umidade, presença)
-    Sensor *s = buscarSensor(raiz_sensores, 1);
-    float temperatura = conversorAD(*s);
-    s = buscarSensor(raiz_sensores, 3);
-    float luminosidade = conversorAD(*s);
-    s = buscarSensor(raiz_sensores, 4);
-    float presenca = conversorAD(*s);
-    s = buscarSensor(raiz_sensores, 5);
-    float umidade = conversorAD(*s);
-
-    // 2. Lógica de Controle
-    if (presenca >= 0.55) {
-        saida |= 0x01; // Bit 0: Presença ON
-
-        // Chamada das funções especialistas
-        saida = analogLuz(saida, luminosidade);
-        saida = analogTemp(saida, temperatura, umidade);
-
-        // A porta abre se houver presença (Deixe a porta aberta)
-        saida &= ~0x02;
-        log_evento("SEGURANCA", "Presenca detectada. Porta DESTRANCADA.");
-    } else {
-        log_evento("SEGURANCA", "Sala vazia. Porta TRANCADA.");
-        // Sala Vazia: Tudo OFF e Porta FECHADA (Bit 1 em 1)
-        saida = 0x02;
+    // 3. Controle de Umidade
+    if (u_atual < (SETPOINT_UMID - HISTERESE_UMID)) {
+        registro_saida_mestre |= BIT_UMIDIFICADOR;
+    }
+    else if (u_atual >= SETPOINT_UMID) {
+        registro_saida_mestre &= ~BIT_UMIDIFICADOR;
     }
 
-    return saida;
+    // 4. Lógica do Dimmer de Iluminação (Bits 4-7)
+    unsigned int intensidade = 0;
+    if (luz_atual < 150.0f)      intensidade = 0x0F; // 100% (F em hexa)
+    else if (luz_atual < 400.0f) intensidade = 0x08; // 50%
+    else                         intensidade = 0x00; // 0%
+
+    // Limpa apenas o campo do dimmer (bits 4-7) e insere o novo valor
+    registro_saida_mestre &= ~(MASCARA_DIMMER << SHIFT_LUZ);
+    registro_saida_mestre |= (intensidade << SHIFT_LUZ);
+
+    // 5. Bits de Status Final
+    registro_saida_mestre |= BIT_PRESENCA;
+    registro_saida_mestre &= ~BIT_PORTA_TRANCA; // Destranca pois há presença
+
+    return registro_saida_mestre;
 }
 
 void* cicloControleAtuadores(void* arg) {
+    log_evento("SISTEMA", "Controlador em execução...");
+
     while(rodando_sistema) {
-        Sensor *s ;
-        s = buscarSensor(raiz_sensores, 2);
-        float umidade = conversorAD(*s);
-        s = buscarSensor(raiz_sensores, 1);
-        float temperatura = conversorAD(*s);
+        Sensor *s_temp = buscarSensor(raiz_sensores, 1);
+        Sensor *s_porta  = buscarSensor(raiz_sensores, 2);
+        Sensor *s_luz  = buscarSensor(raiz_sensores, 3);
+        Sensor *s_pres = buscarSensor(raiz_sensores, 4);
+        Sensor *s_umid = buscarSensor(raiz_sensores, 5);
 
+        if (s_temp && s_luz && s_pres && s_umid) {
+            // Converte os valores atuais para Unidades de Engenharia
+            float t = conversorAD(*s_temp);
+            float l = conversorAD(*s_luz);
+            float u = conversorAD(*s_umid);
+            float p = conversorAD(*s_pres);
 
-        // 1. Executa a lógica para decidir o que ligar
-        unsigned int status = executaSimulacaoPLC();
+            // A ÚNICA chamada de decisão
+            unsigned int novo_status = calcularLogicaControle(t, u, l, (p > 0.5f));
 
-        if(status & 0x01){ //Alguem na sala?
-            // Porta já está aberta
-            int teveControle=0;
-            //Controle da temperatura, simulando um atuador ligado
-            //Aquecedor:
-            if(temperatura <= 20){
-                if(s->leitura_atual <= 20 && s->leitura_atual >= 4){
-                    s->leitura_atual += 0.1;
-                    log_evento("ATUADOR", "AQUECEDOR ON | Temp Atual: %.2fC", temperatura);
-                    //Adicionando ao historico de medidas:
-                    s->historico[s->pos_hist] = conversorAD(*s);
-                    s->pos_hist++;
-                    s->pos_hist %= 10;
-                    teveControle +=1;
-                }
-            }
-            //Ar condicionado
-            else if(temperatura >= 20.5){
-                if(s->leitura_atual <= 20 && s->leitura_atual >= 4){
-                    s->leitura_atual -= 0.1;
-                    log_evento("ATUADOR", "AR-CONDICIONADO ON | Temp Atual: %.2fC", temperatura);
-                    //Adicionando ao historico de medidas:
-                    s->historico[s->pos_hist] = conversorAD(*s);
-                    s->pos_hist++;
-                    s->pos_hist %= 10;
-                    teveControle +=1;
-                }
-            }
+            // Aplica a física (Aumenta/Diminui mA baseado nos bits de novo_status)
+            processarEfeitoAtuadores(novo_status);
 
-            s = buscarSensor(raiz_sensores, 5);
-            //Umidificador
-            if(umidade<=55){
-                if(s->leitura_atual <= 20 && s->leitura_atual >= 4){
-                    s->leitura_atual += 0.1;
-                    log_evento("ATUADOR", "UMIDIFICADOR ON | Umidade: %.2f%%", umidade);
-                    //Adicionando ao historico de medidas:
-                    s->historico[s->pos_hist] = conversorAD(*s);
-                    s->pos_hist++;
-                    s->pos_hist %= 10;
-                    teveControle +=1;
-                }
-            }
-            if(teveControle == 0){
-                log_evento("SISTEMA", "Sala na situação perfeita!");
-                printf("\nSala na situação perfeita.\n");
-                sleep(25);
-            }
-            else{
-                teveControle = 0;
+            // Se o bit de presença estiver desligado no registro, zeramos os sensores
+            if (!(novo_status & BIT_PRESENCA)) {
+                atualizarValor(s_temp, 0);
+                atualizarValor(s_porta, 0);
+                atualizarValor(s_umid, 0);
+                atualizarValor(s_luz, 0);
             }
         }
-        else{
-            log_evento("SISTEMA", "SALA VAZIA | Entrando em modo economia.");
-            printf("\nNinguem na sala, parando ou deixando de efetuar o controle.\n");
-            sleep(15);
-        }
 
-        // 3. Espera 5 segundos para o próximo ciclo
-        sleep(5);
+        sleep(2); // 1 segundo para manter a suavidade
     }
     return NULL;
 }
 
-void monitorarSaidas(unsigned int saida) {
-    printf("\n===========================================");
-    printf("\n   PAINEL DE CONTROLE DO PLC (DEBUG)");
-    printf("\n");
-    printf("\n[RAW DATA] Hex: 0x%08X", saida);
-    printf("\n");
+unsigned int obterRegistroMestre() {
+    return registro_saida_mestre;
+}
 
-    unsigned int clima = (saida >> SHIFT_CLIMA) & MASCARA_CLIMA;
-    // 1. INTERPRETAÇÃO DOS BITS DIGITAIS (Lógica Discreta)
-    printf("\n[DIGITAL]");
-    printf("\n  Presenca:      %s", (saida & 0x01) ? "DETECTADA" : "AUSENTE");
-    printf("\n  Tranca Porta:  %s", (saida & 0x02) ? "BLOQUEADA (FECHADA)" : "LIBERADA (ABERTA)");
-    printf("\n  Luz (Geral):   %s", (saida & 0x04) ? "ON" : "OFF");
-    printf("\n  Ar-Condic.:    %s", (clima & 0x04) ? "ON" : "OFF");
-    printf("\n  Umidificador:  %s", (clima & 0x02) ? "ON" : "OFF");
-    printf("\n  Aquecedor:     %s", (clima & 0x01) ? "ON" : "OFF");
+void monitorarPainelPLC(unsigned int registro) {
+    unsigned int brilho = (registro >> SHIFT_LUZ) & MASCARA_DIMMER;
+    printf("\n" COR_TITULO "================ REGISTRADOR DE SAIDA PLC (0x%08X) =================" COR_RESET, registro);
 
-    // 2. INTERPRETAÇÃO DO ANALÓGICO (Byte 1: Luz)
-    // Deslocamos 8 bits para a direita para ler apenas a máscara da luz
-    unsigned int statusLuz = (saida >> 8) & 0x0F;
+    printf("\n[STATUS]:  Ocupacao: %s | Seguranca: %s",
+           (registro & BIT_PRESENCA) ? "SIM" : "NAO",
+           (registro & BIT_PORTA_TRANCA) ? "TRANCADA" : "LIBERADA");
 
-    printf("\n\n[ANALOGICO - ILUMINACAO]");
-    printf("\n  Intensidade:   ");
-    if (statusLuz & 0x08)      printf("100%% (FULL)");
-    else if (statusLuz & 0x04) printf("75%%");
-    else if (statusLuz & 0x02) printf("50%%");
-    else if (statusLuz & 0x01) printf("25%%");
-    else                       printf("0%% (OFF)");
+    printf("\n[ATUADORES]: Aquec: [%s] | Ar: [%s] | Umid: [%s]",
+           (registro & BIT_AQUECEDOR) ? "LIGADO" : "DESL",
+           (registro & BIT_AR_COND) ? "LIGADO" : "DESL",
+           (registro & BIT_UMIDIFICADOR) ? "LIGADO" : "DESL");
 
-    printf("\n===========================================\n");
+    printf("\n[ILUMINACAO]: Intensidade Dimmer: %d de 15", brilho);
+    printf("\n========================================================================\n");
 }

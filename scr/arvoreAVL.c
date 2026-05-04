@@ -1,154 +1,151 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "../include/arvore.h"
+#include "../include/arvoreAVL.h"
+#include "../include/log.h"
 
-No* criarNo(Sensor s){
-    No *novo = malloc(sizeof(No));
+// --- Funções Auxiliares (Privadas) ---
 
-    if(novo){
-        novo->sensor = s;
-        novo->esquerda = NULL;
-        novo->direita = NULL;
-        novo->altura = 0;
-        return novo;
+static short maior(short a, short b) {
+    return (a > b) ? a : b;
+}
+
+static short getAltura(No *no) {
+    return (no == NULL) ? -1 : no->altura;
+}
+
+static void atualizarAltura(No *no) {
+    if (no != NULL) {
+        no->altura = maior(getAltura(no->esquerda), getAltura(no->direita)) + 1;
     }
-    else
-        log_evento("Erro", "Erro ao alocar memória. (Linha 17, arvoreAVL.c)");
-    return NULL;
 }
 
-short maior(short a, short b){
-    if(a > b)
-        return a;
-    else
-        return b;
+short fatorBalanceamento(No *no) {
+    return (no == NULL) ? 0 : (getAltura(no->esquerda) - getAltura(no->direita));
 }
 
-short getAltura(No *no){
-    if(no == NULL){
-        return -1;
-    }
-    return no->altura;
+// --- Rotações ---
+
+No* rotacionarDireita(No *no) {
+    No *novaRaiz = no->esquerda;
+    No *subArvoreDir = novaRaiz->direita;
+
+    novaRaiz->direita = no;
+    no->esquerda = subArvoreDir;
+
+    atualizarAltura(no);
+    atualizarAltura(novaRaiz);
+
+    return novaRaiz;
 }
 
-short fatorBalanceamento(No *no){
-    if(no == NULL)
-        return 0;
-    return (getAltura(no->esquerda) - getAltura(no->direita));
+No* rotacionarEsquerda(No *no) {
+    No *novaRaiz = no->direita;
+    No *subArvoreEsq = novaRaiz->esquerda;
 
+    novaRaiz->esquerda = no;
+    no->direita = subArvoreEsq;
+
+    atualizarAltura(no);
+    atualizarAltura(novaRaiz);
+
+    return novaRaiz;
 }
 
-No* rotacionarDireita(No *no){
-    No *y, *f;
+// --- Lógica de Balanceamento ---
 
-    y = no->esquerda;
-    f = y->direita;
-
-    y->direita = no;
-    no->esquerda = f;
-
-    no->altura = maior(getAltura(no->esquerda), getAltura(no->direita)) +1;
-    y->altura = maior(getAltura(y->esquerda), getAltura(y->direita)) +1;
-
-    return y;
-}
-
-No* rotacionarEsquerda(No *no){
-    No *y, *f;
-
-    y = no->direita;
-    f = y->esquerda;
-
-    y->esquerda = no;
-    no->direita = f;
-
-    no->altura = maior(getAltura(no->esquerda), getAltura(no->direita)) +1;
-    y->altura = maior(getAltura(y->esquerda), getAltura(y->direita)) +1;
-
-    return y;
-}
-
-No* rotacaoDirEsq(No *no){
-    no->direita = rotacionarDireita(no->direita);
-    return rotacionarEsquerda(no);
-}
-
-No* rotacaoEsqDir(No *no){
-    no->esquerda = rotacionarEsquerda(no->esquerda);
-    return rotacionarDireita(no);
-}
-
-No* balancearAVL(No *raiz){
+No* balancearAVL(No *raiz) {
     short fb = fatorBalanceamento(raiz);
 
-    if(fb < -1 && fatorBalanceamento(raiz->direita) <= 0)
-        raiz = rotacionarEsquerda(raiz);
+    // Caso Esquerda-Esquerda ou Esquerda-Direita
+    if (fb > 1) {
+        if (fatorBalanceamento(raiz->esquerda) < 0) {
+            raiz->esquerda = rotacionarEsquerda(raiz->esquerda);
+        }
+        return rotacionarDireita(raiz);
+    }
 
-    // Rotação à Direita (Esquerda-Esquerda)
-    else if(fb > 1 && fatorBalanceamento(raiz->esquerda) >= 0)
-        raiz = rotacionarDireita(raiz);
-
-    // Rotação Dupla à Direita (Esquerda-Direita)
-    else if(fb > 1 && fatorBalanceamento(raiz->esquerda) < 0)
-        raiz = rotacaoEsqDir(raiz);
-
-    // Rotação Dupla à Esquerda (Direita-Esquerda)
-    else if(fb < -1 && fatorBalanceamento(raiz->direita) > 0)
-        raiz = rotacaoDirEsq(raiz);
+    // Caso Direita-Direita ou Direita-Esquerda
+    if (fb < -1) {
+        if (fatorBalanceamento(raiz->direita) > 0) {
+            raiz->direita = rotacionarDireita(raiz->direita);
+        }
+        return rotacionarEsquerda(raiz);
+    }
 
     return raiz;
 }
 
-No* inserirArvoreAVL(No *raiz, Sensor s){
-    if(raiz == NULL){
-        return criarNo(s);
+// --- Interface Principal ---
+
+No* criarNo(Sensor s) {
+    No *novo = malloc(sizeof(No));
+
+    if (!novo) {
+        log_evento("Erro", "Falha crítica: Alocação de memória para No falhou.");
+        return NULL;
     }
 
-    if(s.id > raiz->sensor.id){
-        raiz->direita = inserirArvoreAVL(raiz->direita, s);
-    }
-    else if(s.id < raiz->sensor.id){
+    novo->sensor = s;
+    novo->esquerda = NULL;
+    novo->direita = NULL;
+    novo->altura = 0;
+    return novo;
+}
+
+No* inserirArvoreAVL(No *raiz, Sensor s) {
+    if (raiz == NULL) return criarNo(s);
+
+    if (s.id < raiz->sensor.id) {
         raiz->esquerda = inserirArvoreAVL(raiz->esquerda, s);
     }
-    else{
-        log_evento("AVISO", "Esse sensor já existe! ID: %d. (Linha 115, arvoreAVL.c)", s.id);
-        printf("\nEsse sensor já existe! ID: %d.\n", s.id);
+    else if (s.id > raiz->sensor.id) {
+        raiz->direita = inserirArvoreAVL(raiz->direita, s);
+    }
+    else {
+        log_evento("AVISO", "ID de sensor duplicado ignorado.");
+        return raiz;
     }
 
-    //Precisa calcular a altura e efetuar o balanceamento
-    raiz->altura = maior(getAltura(raiz->esquerda), getAltura(raiz->direita)) + 1;
+    atualizarAltura(raiz);
     return balancearAVL(raiz);
 }
 
-void imprimirArvore(No *raiz, int nivel){
-    if(raiz){
-        imprimirArvore(raiz->direita, nivel + 1);
-        printf("\n\n");
-        for(int i = 0; i < nivel; i++) printf("\t");
-        printf("%d", raiz->sensor.id);
-        imprimirArvore(raiz->esquerda, nivel + 1);
+No* buscarArvore(No *raiz, int id) {
+    if (raiz == NULL || raiz->sensor.id == id) return raiz;
+
+    if (id < raiz->sensor.id)
+        return buscarArvore(raiz->esquerda, id);
+
+    return buscarArvore(raiz->direita, id);
+}
+
+Sensor* buscarSensor(No *raiz, int id) {
+    No *no = buscarArvore(raiz, id);
+    return (no != NULL) ? &(no->sensor) : NULL;
+}
+
+void imprimirArvore(No *raiz, int nivel) {
+    if (raiz == NULL) return;
+
+    imprimirArvore(raiz->direita, nivel + 1);
+
+    printf("\n");
+    for (int i = 0; i < nivel; i++) printf("\t");
+    printf("%d", raiz->sensor.id);
+
+    imprimirArvore(raiz->esquerda, nivel + 1);
+}
+
+// --- Desalocação de Memória ---
+
+No* liberarArvore(No *raiz) {
+    if (raiz == NULL) {
+        return NULL;
     }
+
+    liberarArvore(raiz->esquerda);
+    liberarArvore(raiz->direita);
+
+    free(raiz);
+    return NULL;
 }
-
-No* buscarArvore(No *raiz, int id){
-    if(raiz == NULL) return NULL;
-    if(id == raiz->sensor.id) return raiz;
-
-    No *aux = raiz;
-    if(id > raiz->sensor.id)
-        aux = buscarArvore(aux->direita, id);
-    else if(id < raiz->sensor.id)
-        aux = buscarArvore(aux->esquerda, id);
-    return aux;
-}
-
-Sensor* buscarSensor(No *raiz, int id){
-    if(raiz == NULL) return NULL;
-    if(id == raiz->sensor.id) return &(raiz->sensor);
-
-    if(id > raiz->sensor.id)
-        return buscarSensor(raiz->direita, id);
-    else
-        return buscarSensor(raiz->esquerda, id);
-}
-
