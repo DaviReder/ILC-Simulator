@@ -16,7 +16,7 @@ Este projeto não é apenas uma simulação de variáveis; é um motor que tradu
 
 ###  Tecnologias e Arquitetura
 
-*   📜 **Log de Eventos & Huggfman:** Registro histórico de todas as decisões tomadas pelo controlador e sua compressão ao atingir 100kb com o algoritmo de Huffman.
+*   📜 **Log de Eventos & Huffman:** Registro histórico de todas as decisões tomadas pelo controlador e sua compressão ao atingir 100kb com o algoritmo de Huffman.
 *   🔄 **Ciclo de Scan Industrial (Scan Cycle):** Execução ininterrupta da lógica de controle em malha fechada, com leitura de entradas, processamento de interrupções e atualização de saídas.
 *   🌳 **Árvore AVL**: Utilização de uma **Árvore AVL** balanceada para registro e busca de sensores/atuadores, garantindo tempos de resposta constantes.
 *   🔢 **Lógica Bitwise Multivariável**: Processamento de decisões através de registradores de 32 bits, permitindo que múltiplos atuadores respondam simultaneamente a diferentes condições de sensores.
@@ -44,16 +44,16 @@ Melhorias lineares que sugiro ao projeto:
 #### Passo a Passo
 1.  **Clone o repositório:**
     ```bash
-    git clone https://github.com/DaviReder/ilc-simulator.git
-    cd ilc_simulator
+    git clone https://github.com/DaviReder/softplc.git
+    cd softplc
     ```
 2.  **Compile o projeto:**
     ```bash
-    gcc main.c src/*.c -I include -lpthread -o ilc_simulator
+    gcc main.c src/*.c -I include -lpthread -o softplc
     ```
 3.  **Execute o simulador:**
     ```bash
-    ./ilc_simulator
+    ./softplc
     ```
 
 ---
