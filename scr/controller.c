@@ -9,7 +9,7 @@
 #include "../include/interface.h"
 #include "../include/atuador.h"
 
-// Variáveis globais definidas em outros módulos
+extern pthread_mutex_t trava_avl;
 extern No *raiz_sensores;
 extern volatile int rodando_sistema;
 static unsigned int registro_saida_mestre = 0;
@@ -71,6 +71,9 @@ void* cicloControleAtuadores(void* arg) {
     log_evento("SISTEMA", "Controlador em execução...");
 
     while(rodando_sistema) {
+        // LOCK: Bloqueia a AVL para realizar a busca e manipulação dos nós com segurança concorrente
+        pthread_mutex_lock(&trava_avl);
+
         Sensor *s_temp = buscarSensor(raiz_sensores, 1);
         Sensor *s_porta  = buscarSensor(raiz_sensores, 2);
         Sensor *s_luz  = buscarSensor(raiz_sensores, 3);
@@ -99,7 +102,10 @@ void* cicloControleAtuadores(void* arg) {
             }
         }
 
-        sleep(2); // 1 segundo para manter a suavidade
+        // UNLOCK: Libera a árvore imediatamente após o término do processamento do ciclo
+        pthread_mutex_unlock(&trava_avl);
+
+        sleep(5); // Mantém o tempo de varredura (Scan Time) do PLC de forma suave
     }
     return NULL;
 }

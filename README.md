@@ -1,4 +1,4 @@
-# 💻 SoftPLC (Simulador de PLC)
+# SoftPLC (Simulador de PLC)
 
 **Simulador de PLC** é um núcleo de processamento lógico de baixo nível desenvolvido em C, projetado para emular o comportamento rigoroso de um **SoftPLC (Software Programmable Logic Controller)**.  O foco principal é demonstrar alta competência em linguagem C, estruturas de dados complexas e sistemas concorrentes aplicados à automação.
 
@@ -25,16 +25,32 @@ Este projeto não é apenas uma simulação de variáveis; é um motor que tradu
 
 ---
 
-### 🚀 Roadmap & Futuras Melhorias
+### Análise Crítica e Limitações Arquiteturais
 
-Melhorias lineares que sugiro ao projeto:
-* **Refatoração para Clean Code**: Revisão profunda da arquitetura para garantir que o projeto seja um exemplo de legibilidade e manutenibilidade. Além de uma busca profunda de vazamentos com Dr. Memory ou ferramentas auxiliares.
-* **Evolução da Interface**: Transição do terminal para uma interface visual mais próxima de sistemas SCADA modernos.
-* **PID Controller**: Implementação de controle Proporcional-Integral-Derivativo para substituir a lógica de histerese.
+Como este projeto possui um caráter fortemente acadêmico e focado no domínio prático de estruturas de dados, foram feitos alguns *trade-offs* de design que, em um ambiente de produção real, seriam abordados de forma diferente:
+
+#### 1. Concorrência e Gargalo de I/O de Tela
+Na camada de interface (`main.c`), as funções de exibição em tela (`printf`) ocorrem dentro da região crítica protegida pelo Mutex da árvore AVL. Em sistemas de automação de tempo real (RTOS), operações de I/O em tela são lentas e bloqueantes, o que introduziria um *jitter* inaceitável no ciclo de scan do PLC. Uma abordagem comercial exigiria técnicas de *Double-Buffering*, onde os dados da AVL são copiados rapidamente para uma estrutura espelho em RAM, liberando o Mutex antes de iniciar a renderização gráfica.
+
+#### 2. Escolha de Estrutura de Dados (Árvore AVL vs. Arrays Estáticos)
+O uso de uma Árvore AVL para indexar os sensores foi uma decisão puramente didática para demonstrar o controle de algoritmos auto-balanceáveis em C puro. Em um PLC real, o número de canais de I/O é fixo e conhecido em tempo de compilação. O uso de alocação dinâmica (`malloc`) em sistemas críticos é evitado devido ao risco de fragmentação de memória e imprevisibilidade de tempo execução. Para produção, a estrutura ideal seria um array estático ou tabela hash direta (O(1)).
+
+#### 3. Acoplamento e Portabilidade de Sistema Operacional
+O projeto apresenta uma arquitetura híbrida de dependências, utilizando a API nativa de Console do Windows para controle de terminal e a biblioteca POSIX (Através do MinGW pthreads) para o gerenciamento de concorrência. Para garantir portabilidade multiplataforma (Linux/macOS), a camada gráfica e de threads deveria ser isolada em uma Camada de Abstração de Sistema Operacional (OSAL) usando diretivas de compilação condicional (`#ifdef _WIN32`).
 
 ---
 
-### 🛠️ Instalação e Execução
+### Roadmap & Futuras Melhorias
+
+Melhorias lineares que sugiro ao projeto:
+Melhorias de engenharia planejadas para o projeto:
+*   **PID Controller:** Implementação de um algoritmo de controle Proporcional-Integral-Derivativo discreto para substituir a lógica atual baseada em histerese.
+*   **Comunicação via Sockets:** Evolução do motor do PLC para escutar e responder requisições de rede através de sockets TCP/UDP, emulando o comportamento de um protocolo industrial (como uma variante simplificada do Modbus TCP).
+*   **Refatoração para Clean Code & Sanity Checks:** Varredura profunda do gerenciamento de memória usando ferramentas de análise dinâmica (como *Valgrind* ou *Dr. Memory*) para assegurar a completa ausência de vazamentos de memória (*memory leaks*).
+
+---
+
+### Instalação e Execução
 
 #### Pré-requisitos
 * Compilador **GCC** (MinGW recomendado para usuários Windows).

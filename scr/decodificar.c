@@ -7,38 +7,51 @@
 // =========== DECODIFICAR POR PASSAGEM ===========
 // ================================================
 
-
+// Mantida a assinatura idêntica à sua original: ordem dos parâmetros e tipo 'No'
 char* decodificar(unsigned char texto[], No *raiz){
+    if (!raiz || !texto) return NULL;
+
     No *aux = raiz;
-    char temp[2];
-    char *decodificado = calloc(strlen(texto), sizeof(char));
-    for(int i=0; texto[i] != '\0'; i++){
+
+    // Aloca memória inicial limpa
+    int tam_max = strlen((char*)texto);
+    char *decodificado = calloc(tam_max + 1, sizeof(char));
+    if (!decodificado) return NULL;
+
+    int idx_escrita = 0;
+
+    for(int i = 0; texto[i] != '\0'; i++){
         if(texto[i] == '0'){
             aux = aux->esq;
         }
         else{
             aux = aux->dir;
         }
+
         if(aux->esq == NULL && aux->dir == NULL){
-            temp[0] = aux->caracter;
-            temp[1] = '\0';
-            strcat(decodificado, temp);
+            decodificado[idx_escrita++] = aux->caracter; // Inserção ultra rápida O(1)
             aux = raiz;
         }
     }
+
+    decodificado[idx_escrita] = '\0'; // Finaliza a string com segurança
+
+    // Ajusta o bloco de memória para o tamanho exato que foi preenchido
+    char *ajustado = realloc(decodificado, (idx_escrita + 1) * sizeof(char));
+    if (ajustado) {
+        decodificado = ajustado;
+    }
+
     return decodificado;
-
 }
-
 
 // ==============================================================
 // =========== DECODIFICAR POR MANIPULAÇÃO DE ARQUIVO ===========
 // ==============================================================
 
-
 void descompactar(char *nome_compactado, char *nome_saida) {
     FILE *entrada = fopen(nome_compactado, "rb");
-    FILE *saida = fopen(nome_saida, "wb"); // Usar "wb" é mais seguro para binários, embora texto funcione
+    FILE *saida = fopen(nome_saida, "wb");
 
     if(!entrada || !saida) {
         if(entrada) fclose(entrada);
@@ -74,7 +87,7 @@ void descompactar(char *nome_compactado, char *nome_saida) {
     // 3. Decodificar e Salvar no Arquivo
     unsigned char byte_atual, proximo_byte;
 
-    // Lógica robusta para ler bit a bit ignorando o lixo no último byte
+    // Lógica robusta original mantida intacta (.esq e .dir)
     if(fread(&byte_atual, sizeof(unsigned char), 1, entrada)) {
         while(fread(&proximo_byte, sizeof(unsigned char), 1, entrada)) {
             for(int i = 7; i >= 0; i--) {
@@ -90,7 +103,6 @@ void descompactar(char *nome_compactado, char *nome_saida) {
         }
 
         // Processar o último byte considerando o lixo
-        // Se lixo for 3, processamos de 7 até 3 (5 bits válidos)
         for(int i = 7; i >= (int)lixo; i--) {
             if(testa_bit(byte_atual, i)) aux = aux->dir;
             else aux = aux->esq;
